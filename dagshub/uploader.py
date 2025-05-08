@@ -1,7 +1,7 @@
 import shutil
 import os
 from dagshub import upload_files
-from dagshub.data_engine import datasources
+from dagshub.data_engine import datasources # type: ignore
 
 def upload_to_dagshub_from_dirs(dir_paths, repo_name, datasource_name='my-datasource', target_folder='data'):
     """ 

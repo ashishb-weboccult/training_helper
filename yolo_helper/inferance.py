@@ -1,108 +1,67 @@
+from ultralytics import YOLO
+from pathlib import Path
 import os
 import shutil
-import glob
+from IPython.display import Image, display
 
-def get_next_run_name(runs_dir: str, base_name: str = "train") -> str:
-    """Get the next available run name (e.g., 'train', 'train1', 'train2', etc.)."""
-    try:
-        existing_runs = [d for d in os.listdir(runs_dir) if d.startswith(base_name)]
-    except FileNotFoundError:
-        return base_name
-    if not existing_runs:
-        return base_name
-    indices = [int(d[len(base_name):]) if d[len(base_name):].isdigit() else 0 for d in existing_runs]
-    next_index = max(indices) + 1 if indices else 1
-    return f"{base_name}{next_index}"
-
-def get_next_version(project_dir: str, model_name: str) -> int:
-    """Determine the next version number for the model."""
-    existing_versions = []
-    for dir_name in os.listdir(project_dir):
-        if dir_name.startswith(f"{model_name}_v"):
-            version_str = dir_name.split("_v")[-1]
-            if version_str.isdigit():
-                existing_versions.append(int(version_str))
-    if not existing_versions:
-        return 1
-    return max(existing_versions) + 1
-
-def train_yolo_model(
-    model,
-    data: str,
-    project_name: str = "default_project",
-    model_name: str = "default_model",
-    base_output_path: str = "models/my_models/detection_models",
-    **kwargs
-) -> None:
-    """
-    Train a YOLO model with automatic versioning and save outputs.
+def model_inferance(
+    source: str,
+    project_name: str,
+    model_name: str,
+    version: int,
+    data_saving_dir: str,
+    base_output_path: str,
+    **predict_kwargs
+):
+    """Run YOLO prediction with task-specific handling.
 
     Args:
-        model: Loaded YOLO model instance (e.g., from ultralytics).
-        data (str): Path to data.yaml file specifying dataset configuration.
-        project_name (str): Name of the project for organizing outputs.
-        model_name (str): Base name of the model.
-        base_output_path (str): Base directory for saving outputs (default is "models/my_models/detection_models").
-        **kwargs: Additional keyword arguments passed to model.train(). See documentation for details.
-
-    Returns:
-        None
+        source (str): Path to the input image, video, or directory.
+        project_name (str): Name of the project.
+        model_name (str): Name of the model.
+        version (int): Model version number.
+        data_saving_dir (str): Directory name for saving data.
+        base_output_path (str): Base path for output.
+        **predict_kwargs: Additional arguments for model.predict().
 
     Raises:
-        Exception: If training fails, the runs folder is preserved for resuming.
+        FileNotFoundError: If model weights are not present at the constructed directory.
     """
-    # Construct project directory
-    project_dir = os.path.join(base_output_path, project_name)
-    os.makedirs(project_dir, exist_ok=True)
+    versioned_model_name = f"{model_name}_v{version}"
+    model_path = os.path.join(base_output_path, project_name, versioned_model_name, "MODEL_WEIGHTS", f"{versioned_model_name}.pt")
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model weights are not present at given directory: {model_path}")
+    
+    model = YOLO(model_path)
+    task = model.task
+    is_single_image = os.path.isfile(source)
 
-    # Determine next version
-    next_version = get_next_version(project_dir, model_name)
-    versioned_model_name = f"{model_name}_v{next_version}"
-    model_dir = os.path.join(project_dir, versioned_model_name)
-    runs_dir = os.path.join(model_dir, "runs")
-    model_utils_dir = os.path.join(model_dir, "MODEL_UTILS")
-    model_weights_dir = os.path.join(model_dir, "MODEL_WEIGHTS")
-    metrics_dir = os.path.join(model_dir, "METRICS")
-
-    # Get next run name and set run folder
-    next_run_name = get_next_run_name(runs_dir)
-    run_folder = os.path.join(runs_dir, next_run_name)
-
-    try:
-        # Train the model
-        model.train(
-            data=data,
-            project=runs_dir,
-            name=next_run_name,
-            **kwargs
+    if is_single_image:
+        predict_kwargs["save"] = True  # Save images for all tasks
+        results = model.predict(
+            source=source,
+            **predict_kwargs
         )
-
-        # Post-processing after successful training
-        for dir_path in [model_utils_dir, model_weights_dir, metrics_dir]:
-            os.makedirs(dir_path, exist_ok=True)
-
-        # Zip the run folder
-        shutil.make_archive(
-            os.path.join(model_utils_dir, versioned_model_name),
-            'zip',
-            run_folder
+        # Default run directory based on task
+        run_base = Path(f"runs/{task}")
+        if run_base.exists():
+            latest_folder = max(run_base.glob("predict*"), key=os.path.getmtime)
+            predicted_image_path = latest_folder / os.path.basename(source)
+            if predicted_image_path.exists():
+                display(Image(filename=str(predicted_image_path)))
+                shutil.rmtree(latest_folder)
+            else:
+                print("Predicted image not found.")
+        else:
+            print("No prediction output found.")
+    else:
+        predict_kwargs["save"] = predict_kwargs.get("save", True)
+        output_dir = os.path.join(base_output_path, project_name, versioned_model_name, "INFERENCE", data_saving_dir)
+        os.makedirs(output_dir, exist_ok=True)
+        results = model.predict(
+            source=source,
+            project=Path(output_dir).parent.parent,
+            name=Path(output_dir).relative_to(Path(output_dir).parent.parent),
+            exist_ok=True,
+            **predict_kwargs
         )
-
-        # Copy best.pt
-        best_pt_path = os.path.join(run_folder, "weights", "best.pt")
-        if os.path.exists(best_pt_path):
-            shutil.copy(
-                best_pt_path,
-                os.path.join(model_weights_dir, f"{versioned_model_name}.pt")
-            )
-
-        # Copy metric files
-        for file in glob.glob(os.path.join(run_folder, "*.png")) + glob.glob(os.path.join(run_folder, "*.csv")):
-            shutil.copy(file, metrics_dir)
-
-        # Delete the runs folder after successful training
-        shutil.rmtree(runs_dir)
-
-    except Exception as e:
-        print(f"Training interrupted: {e}")
-        # Runs folder remains for resuming

@@ -1,0 +1,19 @@
+model: yolov8n.pt
+mode: train
+data: data.yaml
+epochs: 80
+patience: 30 
+
+fliplr: 0.6  
+flipud: 0.6 
+hsv_h: 0.0
+hsv_s: 0.0
+hsv_v: 0.0
+degrees: 0.0
+translate: 0.0
+scale: 0.0
+shear: 0.0
+perspective: 0.0
+mosaic: 0.0
+mixup: 0.0
+copy_paste: 0.0

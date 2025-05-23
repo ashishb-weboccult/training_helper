@@ -1,19 +1,110 @@
-model: yolov8n.pt
+task: detect
 mode: train
+model: yolov8n.pt  # Keeping original model
 data: data.yaml
-epochs: 80
-patience: 30 
+epochs: 120  # Increased from 100 for better convergence
+time: null
+patience: 20  # Reduced from 30 for earlier stopping
+batch: 32  # Increased from 16 for more stable gradients
+imgsz: 640  # Keeping original image size
+save: true
+save_period: 10  # Save every 10 epochs for monitoring
+cache: true  # Changed from false for faster training
+device: null
+workers: 8
+project: metal_plate_detection  # Added project name
+name: optimized_run  # Added run name
+exist_ok: false
+pretrained: true
+optimizer: AdamW  # Changed from auto to AdamW for better convergence
+verbose: true
+seed: 42  # Changed from 0 for reproducibility
+deterministic: true
+single_cls: false
+rect: false
+cos_lr: true  # Changed from false for better learning rate schedule
+close_mosaic: 15  # Increased from 10
+resume: false
+amp: true
+fraction: 1.0
+profile: false
+freeze: null
+multi_scale: true  # Changed from false for better generalization
+overlap_mask: true
+mask_ratio: 4
+dropout: 0.1  # Increased from 0.0 to prevent overfitting
+val: true
+split: val
+save_json: false
+conf: null
+iou: 0.6  # Reduced from 0.7 for better detection of close objects
+max_det: 300
+half: false
+dnn: false
+plots: true
+source: null
+vid_stride: 1
+stream_buffer: false
+visualize: false
+augment: false
+agnostic_nms: false
+classes: null
+retina_masks: false
+embed: null
+show: false
+save_frames: false
+save_txt: false
+save_conf: false
+save_crop: false
+show_labels: true
+show_conf: true
+show_boxes: true
+line_width: null
+format: torchscript
+keras: false
+optimize: false
+int8: false
+dynamic: false
+simplify: true
+opset: null
+workspace: null
+nms: false
 
-fliplr: 0.6  
-flipud: 0.6 
-hsv_h: 0.0
-hsv_s: 0.0
-hsv_v: 0.0
-degrees: 0.0
-translate: 0.0
-scale: 0.0
-shear: 0.0
-perspective: 0.0
-mosaic: 0.0
-mixup: 0.0
-copy_paste: 0.0
+# Learning rate parameters - Critical changes
+lr0: 0.001  # Reduced from 0.01 for more stable training
+lrf: 0.001  # Reduced from 0.01 for smoother convergence
+momentum: 0.9  # Reduced from 0.937
+weight_decay: 0.001  # Increased from 0.0005 for better regularization
+warmup_epochs: 5.0  # Increased from 3.0 for gradual warmup
+warmup_momentum: 0.5  # Reduced from 0.8
+warmup_bias_lr: 0.05  # Reduced from 0.1
+
+# Loss function weights - Optimized for small object detection
+box: 10.0  # Increased from 7.5 to focus more on box regression
+cls: 1.0  # Increased from 0.5 for better classification
+dfl: 2.0  # Increased from 1.5 for smoother distribution focal loss
+pose: 12.0
+kobj: 2.0  # Increased from 1.0 for better objectness
+nbs: 64
+
+# Data augmentation - Reduced for small object preservation
+hsv_h: 0.01  # Reduced from 0.0 (minimal hue variation)
+hsv_s: 0.3  # Reduced from 0.4 (less saturation change)
+hsv_v: 0.3  # Reduced from 0.5 (less brightness change)
+degrees: 5.0  # Increased from 0.0 (small rotation for metal plates)
+translate: 0.05  # Reduced from 0.1 (less translation to preserve small objects)
+scale: 0.2  # Reduced from 0.3 (less scaling to preserve object size)
+shear: 2.0  # Increased from 0.0 (small shear for metal plate variations)
+perspective: 0.0001  # Increased from 0.0 (minimal perspective change)
+flipud: 0.0  # Reduced from 0.5 (metal plates have orientation)
+fliplr: 0.3  # Reduced from 0.5 (some horizontal flip for variety)
+bgr: 0.0
+mosaic: 0.5  # Reduced from 0.0 to enable mosaic for small objects
+mixup: 0.1  # Increased from 0.0 for better generalization
+cutmix: 0.0
+copy_paste: 0.1  # Increased from 0.0 for small object augmentation
+copy_paste_mode: flip
+auto_augment: randaugment
+erasing: 0.05  # Increased from 0.0 (minimal random erasing)
+cfg: null
+tracker: botsort.yamls
